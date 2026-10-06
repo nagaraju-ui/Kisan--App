@@ -1,0 +1,101 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kisan Budget Manager</title><meta name="theme-color" content="#2e7d32">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<style>
+*{box-sizing:border-box}body{margin:0;font:17px system-ui,sans-serif;background:#f1f6f1;color:#1b2b1b;padding-bottom:84px}
+header{background:#2e7d32;color:#fff;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:5}
+header b{font-size:19px}select,input,button{font:inherit}header select{padding:6px;border-radius:8px;border:0}
+main{max-width:760px;margin:auto;padding:14px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.card{background:#fff;border-radius:14px;padding:12px;box-shadow:0 1px 4px #0002}.card small{color:#666;display:block}.card b{font-size:21px}
+.g{color:#2e7d32}.r{color:#c62828}h2{margin:18px 0 8px;font-size:19px}
+.btn{background:#2e7d32;color:#fff;border:0;border-radius:12px;padding:14px;font-weight:600;width:100%;cursor:pointer}.btn.o{background:#fff;color:#2e7d32;border:2px solid #2e7d32}
+.row{display:flex;justify-content:space-between;align-items:center;gap:8px;background:#fff;border-radius:12px;padding:10px 12px;margin:6px 0}
+.row small{color:#666;display:block}.x{background:#fdecea;color:#c62828;border:0;border-radius:8px;padding:6px 10px;cursor:pointer}
+nav{position:fixed;bottom:0;left:0;right:0;background:#fff;display:flex;box-shadow:0 -2px 8px #0003;z-index:5}
+nav button{flex:1;border:0;background:none;padding:10px 0;font-size:13px;color:#555}nav button span{display:block;font-size:24px}nav .on{color:#2e7d32;font-weight:700}
+.modal{position:fixed;inset:0;background:#0007;z-index:9;display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:#fff;width:100%;max-width:560px;border-radius:18px 18px 0 0;padding:16px;max-height:90vh;overflow:auto}
+label{display:block;font-size:14px;color:#555;margin-top:8px}input,select.f{width:100%;padding:12px;border:1px solid #bbb;border-radius:10px;margin-top:3px}
+.toast{position:fixed;top:64px;left:50%;transform:translateX(-50%);padding:10px 16px;border-radius:10px;color:#fff;z-index:20}
+.warn{background:#fff4e5;border-left:4px solid #ef6c00;padding:10px;border-radius:8px;margin:6px 0}.login{max-width:380px;margin:60px auto}
+@media print{header,nav,.btn{display:none}}
+</style></head><body><div id="app"></div><script>
+const T={en:{home:'Home',farm:'Farm',household:'Household',budget:'Budget',reports:'Reports',income:'Income',expenses:'Expenses',balance:'Balance',savings:'Savings',profit:'Farming Profit/Loss',gm:'Good Morning, Farmer!',ga:'Good Afternoon, Farmer!',ge:'Good Evening, Farmer!',today:"Today's Financial Summary",save:'Save',cancel:'Cancel',login:'Login',signup:'Sign up',logout:'Logout',amount:'Amount (₹)',date:'Date',category:'Category',description:'Description',crop:'Crop',loans:'Loans',future:'Future Expenses',schemes:'Government Support'},
+te:{home:'హోమ్',farm:'పొలం',household:'ఇల్లు',budget:'బడ్జెట్',reports:'రిపోర్టులు',income:'ఆదాయం',expenses:'ఖర్చులు',balance:'నిల్వ',savings:'పొదుపు',profit:'వ్యవసాయ లాభం/నష్టం',gm:'శుభోదయం, రైతు గారూ!',ga:'శుభ మధ్యాహ్నం, రైతు గారూ!',ge:'శుభ సాయంత్రం, రైతు గారూ!',today:'ఈ రోజు ఆర్థిక సారాంశం',save:'సేవ్',cancel:'రద్దు',login:'లాగిన్',signup:'సైన్ అప్',logout:'లాగౌట్',amount:'మొత్తం (₹)',date:'తేదీ',category:'వర్గం',description:'వివరణ',crop:'పంట',loans:'రుణాలు',future:'భవిష్యత్ ఖర్చులు',schemes:'ప్రభుత్వ సహాయం'},
+hi:{home:'होम',farm:'खेत',household:'घर',budget:'बजट',reports:'रिपोर्ट',income:'आय',expenses:'खर्च',balance:'शेष',savings:'बचत',profit:'खेती लाभ/हानि',gm:'सुप्रभात, किसान जी!',ga:'नमस्कार, किसान जी!',ge:'शुभ संध्या, किसान जी!',today:'आज का वित्तीय सारांश',save:'सेव',cancel:'रद्द',login:'लॉगिन',signup:'साइन अप',logout:'लॉगआउट',amount:'राशि (₹)',date:'तारीख',category:'श्रेणी',description:'विवरण',crop:'फसल',loans:'ऋण',future:'आगामी खर्च',schemes:'सरकारी सहायता'}};
+let lang=localStorage.lang||'en',tok=localStorage.tok,tab='home',D={},charts=[];
+const t=k=>T[lang][k]||T.en[k]||k.replace(/_/g,' ').replace(/^./,c=>c.toUpperCase());
+const inr=n=>'₹'+Number(n||0).toLocaleString('en-IN',{maximumFractionDigits:0}),dt=s=>s?new Date(s).toLocaleDateString('en-IN'):'';
+const $=s=>document.querySelector(s),today=()=>new Date().toISOString().slice(0,10);
+function toast(m,bad){const e=document.createElement('div');e.className='toast';e.style.background=bad?'#c62828':'#2e7d32';e.textContent=m;document.body.appendChild(e);setTimeout(()=>e.remove(),2800)}
+async function api(p,m='GET',b){const r=await fetch('/api/'+p,{method:m,headers:{'Content-Type':'application/json',...(tok?{Authorization:'Bearer '+tok}:{})},body:b?JSON.stringify(b):undefined});
+ if(r.status==401&&tok&&!p.startsWith('auth/login')){logout();throw new Error('Please log in again')}
+ const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(typeof j.detail==='string'?j.detail:Array.isArray(j.detail)?j.detail.map(e=>e.loc.slice(-1)+': '+e.msg).join('; '):'Error');return j}
+function logout(){localStorage.removeItem('tok');tok=null;render()}
+const cat={fe:['seeds','fertilizers','pesticides','labour','machinery','irrigation','transportation','other'],he:['food','education','healthcare','utilities','transport','house','family','other'],hi:['farming','salary','dairy','poultry','livestock','subsidy','rental','business','other']},pay=['cash','upi','bank','card','credit','other'];
+const FORMS={fe:{p:'farm-expenses',f:[['date','date'],['crop_id','crop'],['category','sel',cat.fe],['description','text'],['amount','num'],['payment_method','sel',pay]]},
+fi:{p:'farm-incomes',f:[['date','date'],['crop_id','crop'],['quantity','num'],['unit','sel',['quintal','kg','ton']],['price','num'],['buyer','text'],['transport_cost','num'],['other_deductions','num']]},
+he:{p:'household-expenses',f:[['date','date'],['category','sel',cat.he],['description','text'],['amount','num'],['payment_method','sel',pay]]},
+hi:{p:'household-incomes',f:[['date','date'],['source','sel',cat.hi],['description','text'],['amount','num']]},
+crop:{p:'crops',f:[['name','text'],['variety','text'],['season','text'],['area','num'],['sowing_date','date?'],['harvest_date','date?'],['expected_production','num?'],['expected_price','num?']]},
+loan:{p:'loans',f:[['name','text'],['lender','text'],['amount','num'],['interest_rate','num?'],['start_date','date'],['duration_months','num'],['emi','num?'],['paid','num?'],['next_payment_date','date?']]},
+fut:{p:'future-expenses',f:[['due_date','date'],['kind','text'],['description','text'],['amount','num'],['expected_income','num?']]},
+plan:{p:'budget-plans',f:[['month','text'],['planned_income','num'],['planned_expense','num']]},
+sub:{p:'subsidies',f:[['scheme','text'],['department','text'],['applied_on','date?'],['expected','num?'],['received','num?'],['status','sel',['applied','approved','pending','received','rejected']]]}};
+function modal(h){const m=document.createElement('div');m.className='modal';m.innerHTML='<div class="sheet">'+h+'</div>';m.onclick=e=>{if(e.target==m)m.remove()};document.body.appendChild(m);return m}
+function addForm(k){const F=FORMS[k];let h='<h2 style="margin-top:0">+ '+t(k=='fe'?'farm_expense':k=='fi'?'farm_income':k=='he'?'household_expense':k=='hi'?'household_income':k)+'</h2><form>';
+ for(const[n,ty,o]of F.f){const opt=ty.endsWith('?'),b=ty.replace('?','');h+=`<label>${t(n)}${opt?'':' *'}</label>`;
+  if(b=='sel')h+=`<select class="f" name="${n}">${o.map(x=>`<option>${x}</option>`).join('')}</select>`;
+  else if(b=='crop')h+=`<select class="f" name="${n}"><option value="">—</option>${(D.crops||[]).map(c=>`<option value="${c.id}">${c.name}</option>`).join('')}</select>`;
+  else h+=`<input name="${n}" type="${b=='num'?'number':b}" ${b=='num'?'min="0" step="any" inputmode="decimal"':''} ${b=='date'&&!opt?`value="${today()}"`:''} ${n=='month'?`value="${today().slice(0,7)}"`:''} ${opt?'':'required'}>`}
+ h+='<div class="grid" style="margin-top:14px"><button type="button" class="btn o" id="c">'+t('cancel')+'</button><button class="btn">'+t('save')+'</button></div></form>';
+ const m=modal(h);m.querySelector('#c').onclick=()=>m.remove();
+ m.querySelector('form').onsubmit=async e=>{e.preventDefault();const b={};for(const[n,ty]of F.f){let v=e.target[n].value;const x=ty.replace('?','');
+  if(x=='num')b[n]=v===''?0:+v;else if(v==='')b[n]=(x=='date'||x=='crop')?null:'';else b[n]=x=='crop'?+v:v}
+  try{await api(F.p,'POST',b);m.remove();toast('✔ Saved');await refresh()}catch(er){toast(er.message,1)}}}
+async function del(p,id){if(!confirm('Delete?'))return;try{await api(p+'/'+id,'DELETE');toast('Deleted');await refresh()}catch(e){toast(e.message,1)}}
+const rows=(p,a,fn)=>(a||[]).slice(0,30).map(o=>`<div class="row"><div>${fn(o)}</div><button class="x" onclick="del('${p}',${o.id})">✕</button></div>`).join('')||'<small>—</small>';
+const add=(k,l)=>`<button class="btn" onclick="addForm('${k}')">➕ ${l}</button>`;
+const card=(l,v,c='')=>`<div class="card"><small>${l}</small><b class="${c}">${v}</b></div>`;
+async function refresh(){const P={sum:'summary',crops:'crops',fe:'farm-expenses',fi:'farm-incomes',hi:'household-incomes',he:'household-expenses',loans:'loans',fut:'future-expenses',subs:'subsidies'};
+ const k=Object.keys(P),r=await Promise.all(k.map(x=>api(P[x])));k.forEach((x,i)=>D[x]=r[i]);D.chk=await api('future-check');D.bc=await api('budget-check/'+today().slice(0,7));render()}
+function insights(){const s=D.sum,a=[];if(s.farming.income||s.farming.expenses)a.push(`Farming net: ${inr(s.farming.profit)}`);
+ if(s.farming.upcoming_expenses)a.push(`You have ${inr(s.farming.upcoming_expenses)} in upcoming expenses.`);
+ s.upcoming_emis.forEach(e=>a.push(`Loan repayment of ${inr(e.emi)} (${e.loan}) is due on ${dt(e.date)}.`));
+ if(D.bc.over_budget)a.push(`Household spending (${inr(D.bc.actual_expense)}) is above the planned budget (${inr(D.bc.planned_expense)}).`);
+ return a.map(x=>`<div class="warn">💡 ${x}</div>`).join('')}
+const pages={
+home(){const c=D.sum.combined,h=new Date().getHours();return `<h2 style="margin-top:0">${t(h<12?'gm':h<17?'ga':'ge')}</h2><h2>${t('today')}</h2><div class="grid">${card(t('income'),inr(c.total_income),'g')}${card(t('expenses'),inr(c.total_expenses),'r')}${card(t('balance'),inr(c.available_balance),c.available_balance<0?'r':'g')}${card(t('savings'),inr(c.total_savings))}</div><div style="display:grid;gap:8px;margin:14px 0">${add('fe','Add Farm Expense')}${add('fi','Add Farm Income')}${add('he','Add Household Expense')}${add('hi','Add Income')}<button class="btn o" onclick="go('reports')">📊 View Reports</button></div>${insights()}`},
+farm(){const f=D.sum.farming;return `<div class="grid">${card('Farming Income',inr(f.income),'g')}${card('Farming Expenses',inr(f.expenses),'r')}${card(t('profit'),inr(f.profit),f.profit<0?'r':'g')}${card('Current Crop',f.current_crop||'—')}${card('Land',f.land_area+' '+f.unit)}${card('Upcoming',inr(f.upcoming_expenses))}</div>
+<div class="grid" style="margin-top:12px">${add('crop','Crop')}${add('fe','Expense')}</div><div style="margin-top:8px">${add('fi','Crop Sale')}</div>
+<h2>🌾 Crops</h2>${rows('crops',D.crops,c=>`<b>${c.name}</b> ${c.area} acres<small>${dt(c.sowing_date)}</small><button class="x" style="background:#e8f5e9;color:#2e7d32;margin-top:4px" onclick="event.stopPropagation();cropProfit(${c.id})">Profit</button>`)}
+<h2>Farm expenses</h2>${rows('farm-expenses',D.fe,e=>`${e.category} · ${inr(e.amount)}<small>${dt(e.date)} ${e.description}</small>`)}
+<h2>Crop sales</h2>${rows('farm-incomes',D.fi,e=>`${e.quantity} ${e.unit} × ${inr(e.price)} = <b class="g">${inr(e.net_income)}</b><small>${dt(e.date)} ${e.buyer}</small>`)}`},
+household(){const h=D.sum.household;return `<div class="grid">${card(t('income'),inr(h.income),'g')}${card(t('expenses'),inr(h.expenses),'r')}${card(t('savings'),inr(h.savings),h.savings<0?'r':'g')}${card('Loans left',inr(h.outstanding_loans))}</div>
+<div class="grid" style="margin:12px 0">${add('he','Expense')}${add('hi','Income')}</div><h2>Expenses</h2>${rows('household-expenses',D.he,e=>`${e.category} · ${inr(e.amount)}<small>${dt(e.date)} ${e.description}</small>`)}<h2>Income</h2>${rows('household-incomes',D.hi,e=>`${e.source} · <span class="g">${inr(e.amount)}</span><small>${dt(e.date)}</small>`)}`},
+budget(){const b=D.bc,k=D.chk;return `<h2 style="margin-top:0">Monthly budget</h2>${b.plan===null?'<small>No plan for this month</small>':`<div class="${b.over_budget?'warn':'card'}">${b.message}: planned ${inr(b.planned_expense)}, actual ${inr(b.actual_expense)}</div>`}${add('plan','Set Monthly Budget')}
+<h2>🏦 ${t('loans')}</h2>${add('loan','Loan')}${rows('loans',D.loans,l=>`<b>${l.name}</b> ${l.lender}<small>Left ${inr(l.amount-l.paid)} · EMI ${inr(l.emi)} · ${l.interest_rate}% · next ${dt(l.next_payment_date)}</small><button class="x" style="background:#e8f5e9;color:#2e7d32;margin-top:4px" onclick="interest(${l.id})">Interest</button>`)}
+<h2>📅 ${t('future')}</h2><div class="card">Upcoming ${inr(k.upcoming_expenses)} · Balance ${inr(k.available_balance)} · Expected income ${inr(k.expected_income)}<br><b>${k.message}</b></div>${add('fut','Future Expense')}${rows('future-expenses',D.fut,f=>`${f.kind} ${inr(f.amount)}<small>${dt(f.due_date)}</small>`)}
+<h2>🏛 ${t('schemes')}</h2><small>Eligibility and current rules must be verified from official government sources.</small>${add('sub','Scheme')}${rows('subsidies',D.subs,s=>`${s.scheme}<small>${s.status} · expected ${inr(s.expected)} · received ${inr(s.received)}</small>`)}`},
+reports(){return `<canvas id="c1" height="220"></canvas><h2>Farm expense categories</h2><canvas id="c2" height="220"></canvas><div class="grid" style="margin-top:14px"><button class="btn" onclick="csv()">⬇ CSV</button><button class="btn o" onclick="print()">🖨 PDF</button></div>`}};
+function after(){charts.forEach(c=>c.destroy());charts=[];if(tab!='reports')return;const y=new Date().getFullYear(),M=Array.from({length:12},()=>[0,0]);
+ const f=(a,i,fn)=>a.forEach(o=>{const d=new Date(o.date);if(d.getFullYear()==y)M[d.getMonth()][i]+=fn(o)});
+ f(D.fi,0,o=>o.net_income);f(D.hi,0,o=>o.source=='farming'?0:o.amount);f(D.fe,1,o=>o.amount);f(D.he,1,o=>o.amount);
+ charts.push(new Chart($('#c1'),{type:'bar',data:{labels:['J','F','M','A','M','J','J','A','S','O','N','D'],datasets:[{label:t('income'),data:M.map(x=>x[0]),backgroundColor:'#2e7d32'},{label:t('expenses'),data:M.map(x=>x[1]),backgroundColor:'#c62828'}]},options:{plugins:{title:{display:true,text:'Monthly income vs expenses '+y}}}}));
+ const C={};D.fe.forEach(e=>C[e.category]=(C[e.category]||0)+e.amount);charts.push(new Chart($('#c2'),{type:'doughnut',data:{labels:Object.keys(C),datasets:[{data:Object.values(C)}]}}))}
+function csv(){const L=[['type','date','category','description','amount']];D.fe.forEach(e=>L.push(['farm expense',e.date,e.category,e.description,e.amount]));D.fi.forEach(e=>L.push(['farm income',e.date,'sale',e.buyer,e.net_income]));D.he.forEach(e=>L.push(['household expense',e.date,e.category,e.description,e.amount]));D.hi.forEach(e=>L.push(['household income',e.date,e.source,e.description,e.amount]));
+ const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([L.map(r=>r.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\n')],{type:'text/csv'}));a.download='kisan-report.csv';a.click()}
+async function cropProfit(id){const p=await api(`crops/${id}/profit`);const m=modal(`<h2 style="margin-top:0">${p.crop}</h2><div class="grid">${card('Total cost',inr(p.total_cost),'r')}${card('Gross income',inr(p.gross_income),'g')}${card('Net profit',inr(p.net_profit),p.net_profit<0?'r':'g')}${card('Break-even/quintal',p.break_even_price_per_quintal?inr(p.break_even_price_per_quintal):'—')}${card('Cost/acre',inr(p.cost_per_acre))}${card('Profit/acre',inr(p.profit_per_acre))}</div><br><button class="btn" id="c">OK</button>`);m.querySelector('#c').onclick=()=>m.remove()}
+function interest(id){const m=modal(`<h2 style="margin-top:0">Loan interest</h2><label>From</label><input type="date" id="a"><label>To</label><input type="date" id="b" value="${today()}"><label>Type</label><select class="f" id="ty"><option value="simple">Simple</option><option value="compound">Compound (yearly)</option></select><button class="btn" style="margin-top:12px" id="go">Calculate</button><div id="out" style="margin-top:10px"></div>`);
+ m.querySelector('#go').onclick=async()=>{const q=new URLSearchParams({type:m.querySelector('#ty').value});if(m.querySelector('#a').value)q.set('from_date',m.querySelector('#a').value);if(m.querySelector('#b').value)q.set('to_date',m.querySelector('#b').value);
+  try{const r=await api(`loans/${id}/interest?`+q);m.querySelector('#out').innerHTML=`<div class="card">${dt(r.from)} → ${dt(r.to)} (${r.days} days)<br>Interest in this period: <b class="r">${inr(r.interest_between_dates)}</b><br>Interest since start: ${inr(r.interest_since_start)}<br>Total payable: ${inr(r.total_payable_till_to_date)}<small>${r.note}</small></div>`}catch(e){toast(e.message,1)}}}
+function go(x){tab=x;render()}
+function login(){let mode='login';const draw=()=>{$('#app').innerHTML=`<div class="login card"><h2 style="margin-top:0">🌾 Kisan Budget Manager</h2><form><label>Email</label><input name="e" type="email" required><label>Password</label><input name="p" type="password" minlength="6" required>${mode=='signup'?'<label>Name</label><input name="n">':''}<br><br><button class="btn">${t(mode)}</button></form><p style="text-align:center"><a href="#" id="sw">${mode=='login'?t('signup'):t('login')}</a></p><small>Demo: ramesh@example.com / ramesh123</small></div>`;
+ $('#sw').onclick=e=>{e.preventDefault();mode=mode=='login'?'signup':'login';draw()};
+ $('form').onsubmit=async e=>{e.preventDefault();const f=e.target;try{const r=await api('auth/'+mode,'POST',{email:f.e.value,password:f.p.value,name:f.n?f.n.value:''});tok=r.token;localStorage.tok=tok;await refresh()}catch(er){toast(er.message,1)}}};draw()}
+function render(){if(!tok||!D.sum)return tok?refresh().catch(()=>logout()):login();
+ const N=[['home','🏠'],['farm','🌾'],['household','👨‍👩‍👧'],['budget','💰'],['reports','📊']];
+ $('#app').innerHTML=`<header><b>🌾 Kisan</b><span><select id="lg">${['en','te','hi'].map(l=>`<option value="${l}" ${l==lang?'selected':''}>${{en:'English',te:'తెలుగు',hi:'हिन्दी'}[l]}</option>`).join('')}</select> <button class="x" id="lo">${t('logout')}</button></span></header><main>${pages[tab]()}</main><nav>${N.map(([k,i])=>`<button class="${k==tab?'on':''}" onclick="go('${k}')"><span>${i}</span>${t(k)}</button>`).join('')}</nav>`;
+ $('#lg').onchange=e=>{lang=localStorage.lang=e.target.value;render()};$('#lo').onclick=logout;after()}
+render();
+</script></body></html>

@@ -1,0 +1,7 @@
+fastapi
+uvicorn[standard]
+sqlalchemy>=2.0.36
+psycopg[binary]>=3.2.3
+pydantic[email]>=2.9
+pyjwt
+bcrypt
