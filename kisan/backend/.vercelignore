@@ -1,0 +1,5 @@
+venv
+neon.txt
+__pycache__
+*.db
+.env
